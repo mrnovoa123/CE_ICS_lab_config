@@ -1,0 +1,70 @@
+# labcyber/Vagrantfile — Laboratorio MP5021 (TecnoMariña S.L.)
+WAZUH_BRANCH    = "4.14"      # rama del instalador (packages.wazuh.com/<rama>/)
+WAZUH_AGENT_VER = "4.14.0-1"  # versión exacta del agente, igual o menor que el manager
+LAN             = "labcyber-lan"
+
+Vagrant.configure("2") do |config|
+  config.vm.box_check_update = false
+  config.vm.boot_timeout     = 900
+
+  # ---------- SIEM: Wazuh + Suricata ----------
+  config.vm.define "siem", primary: true do |m|
+    m.vm.box      = "bento/ubuntu-22.04"
+    m.vm.hostname = "siem"
+    m.vm.network "private_network", ip: "10.10.10.10", virtualbox__intnet: LAN
+    m.vm.network "private_network", ip: "192.168.56.10"
+    m.vm.provider "virtualbox" do |vb|
+      vb.name   = "lab-siem"
+      vb.memory = 5120
+      vb.cpus   = 2
+      vb.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]  # Suricata ve toda la LAN
+    end
+    m.vm.provision "shell", path: "provision/siem.sh", args: [WAZUH_BRANCH]
+  end
+
+  # ---------- SRVWEB: víctima LAMP ----------
+  config.vm.define "srvweb" do |m|
+    m.vm.box      = "bento/ubuntu-22.04"
+    m.vm.hostname = "srvweb"
+    m.vm.network "private_network", ip: "10.10.10.30", virtualbox__intnet: LAN
+    m.vm.network "private_network", ip: "192.168.56.30"
+    m.vm.provider "virtualbox" do |vb|
+      vb.name   = "lab-srvweb"
+      vb.memory = 1024
+      vb.cpus   = 1
+    end
+    m.vm.provision "shell", path: "provision/srvweb.sh", args: [WAZUH_AGENT_VER]
+  end
+
+  # ---------- WIN10: víctima Windows ----------
+  config.vm.define "win10", autostart: false do |m|
+    m.vm.box          = "gusztavvargadr/windows-10"
+    m.vm.hostname     = "win10"
+    m.vm.guest        = :windows
+    m.vm.communicator = "winrm"
+    m.vm.network "private_network", ip: "10.10.10.20", virtualbox__intnet: LAN
+    m.vm.network "private_network", ip: "192.168.56.20"
+    m.vm.provider "virtualbox" do |vb|
+      vb.name   = "lab-win10"
+      vb.memory = 3072
+      vb.cpus   = 2
+      vb.gui    = true
+    end
+    m.vm.provision "shell", path: "provision/win10.ps1", args: [WAZUH_AGENT_VER]
+  end
+
+  # ---------- KALI: atacante ----------
+  config.vm.define "kali" do |m|
+    m.vm.box      = "kalilinux/rolling"
+    m.vm.hostname = "kali"
+    m.vm.network "private_network", ip: "10.10.10.100", virtualbox__intnet: LAN
+    m.vm.network "private_network", ip: "192.168.56.100"
+    m.vm.provider "virtualbox" do |vb|
+      vb.name   = "lab-kali"
+      vb.memory = 2048
+      vb.cpus   = 2
+      vb.gui    = true
+    end
+    m.vm.provision "shell", path: "provision/kali.sh"
+  end
+end

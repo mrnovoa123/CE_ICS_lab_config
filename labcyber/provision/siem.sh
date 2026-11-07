@@ -19,7 +19,12 @@ add-apt-repository -y ppa:oisf/suricata-stable
 apt-get update
 apt-get install -y suricata
 CONF=/etc/suricata/suricata.yaml
-sed -i "s|^\(\s*HOME_NET:\).*|\1 \"[10.10.10.0/24]\"|" "$CONF"
+# HOME_NET = solo los activos protegidos (siem .10, win10 .20, srvweb .30).
+# Kali (.100) queda FUERA → en EXTERNAL_NET → las reglas ET ($EXTERNAL_NET -> $HOME_NET) SÍ saltan con sus ataques.
+# Antes era HOME_NET "[10.10.10.0/24]" (Kali dentro): solo saltaban las reglas locales escritas con "any".
+# Volver atrás (en la VM ya creada):  sudo bash /vagrant/provision/suricata-homenet.sh red
+sed -i "s|^\(\s*HOME_NET:\).*|\1 \"[10.10.10.10,10.10.10.20,10.10.10.30]\"|" "$CONF"
+sed -i "s|^\(\s*EXTERNAL_NET:\).*|\1 \"!\$HOME_NET\"|" "$CONF"
 sed -i "s|interface: eth0|interface: ${LAN_IF}|g" "$CONF"
 [ -f /etc/default/suricata ] && sed -i "s|^IFACE=.*|IFACE=${LAN_IF}|" /etc/default/suricata
 
